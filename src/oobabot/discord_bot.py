@@ -22,6 +22,9 @@ from oobabot import response_stats
 from oobabot import types
 
 
+import re
+
+
 class DiscordBot(discord.Client):
     """
     Main bot class.  Connects to Discord, monitors for messages,
@@ -390,47 +393,54 @@ class DiscordBot(discord.Client):
                 if last_sent_message is not None:
                     sent_message_count = 1
             else:
-                if self.dont_split_responses:
-                    response = await self.ooba_client.request_as_string(prompt_prefix)
-                    (
-                        last_sent_message,
-                        aborted_by_us,
-                    ) = await self._send_response_message(
-                        response,
-                        this_response_stat,
-                        response_channel,
-                        response_channel_id,
-                        allowed_mentions,
-                        reference,
-                    )
-                    if last_sent_message is not None:
-                        sent_message_count = 1
-                else:
-                    sent_message_count = 0
-                    last_sent_message = None
-                    async for sentence in self.ooba_client.request_by_message(
-                        prompt_prefix
-                    ):
+                num_retries = 0
+                while sent_message_count < 1 and num_retries < 10:
+                    if self.dont_split_responses:
+                        response = await self.ooba_client.request_as_string(prompt_prefix)
                         (
-                            sent_message,
-                            abort_response,
+                            last_sent_message,
+                            aborted_by_us,
                         ) = await self._send_response_message(
-                            sentence,
+                            response,
                             this_response_stat,
                             response_channel,
                             response_channel_id,
-                            allowed_mentions=allowed_mentions,
-                            reference=reference,
+                            allowed_mentions,
+                            reference,
                         )
-                        if sent_message is not None:
-                            last_sent_message = sent_message
-                            sent_message_count += 1
-                            # only use the reference for the first
-                            # message in a multi-message chain
-                            reference = None
-                        if abort_response:
-                            aborted_by_us = True
-                            break
+                        if last_sent_message is None:
+                            fancy_logger.get().warning(
+                                "Retrying message due to failed response."
+                            )
+                            num_retries += 1
+                        if last_sent_message is not None:
+                            sent_message_count = 1
+                    else:
+                        sent_message_count = 0
+                        last_sent_message = None
+                        async for sentence in self.ooba_client.request_by_message(
+                            prompt_prefix
+                        ):
+                            (
+                                sent_message,
+                                abort_response,
+                            ) = await self._send_response_message(
+                                sentence,
+                                this_response_stat,
+                                response_channel,
+                                response_channel_id,
+                                allowed_mentions=allowed_mentions,
+                                reference=reference,
+                            )
+                            if sent_message is not None:
+                                last_sent_message = sent_message
+                                sent_message_count += 1
+                                # only use the reference for the first
+                                # message in a multi-message chain
+                                reference = None
+                            if abort_response:
+                                aborted_by_us = True
+                                break
 
         except discord.DiscordException as err:
             fancy_logger.get().error("Error: %s", err, exc_info=True)
@@ -454,6 +464,17 @@ class DiscordBot(discord.Client):
 
         this_response_stat.write_to_log(f"Response to {message.author_name} done!  ")
         self.response_stats.log_response_success(this_response_stat)
+
+    def _censor_text(textfake, textreal):
+        url_regex = re.compile(r'(https?\:\/\/|www\.)[a-zA-Z0-9\.\/\?\:@\-_=#]+\.([a-zA-Z]){2,6}([a-zA-Z0-9\.\&\/\?\:@\-_=#])*', re.IGNORECASE)
+        text = re.sub(url_regex, "🚫🔗", textreal)
+        bad_words_file = 'profanity_wordlist.txt'
+        with open(bad_words_file, 'r') as file:
+            censored_words_list = set(file.read().splitlines())
+            words = re.split(r'([^a-zA-Z0-9])', text)
+            censored_words = [word if word.lower() not in censored_words_list else '🤬' for word in words]
+            censored_text = ''.join(censored_words)
+            return censored_text
 
     async def _send_response_message(
         self,
@@ -479,6 +500,7 @@ class DiscordBot(discord.Client):
         - the sent discord message, if any
         - a boolean indicating if we need to abort the response entirely
         """
+        response = self._censor_text(response)
         (sentence, abort_response) = self._filter_immersion_breaking_lines(response)
         if abort_response:
             return (None, True)
