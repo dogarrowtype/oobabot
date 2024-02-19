@@ -80,6 +80,8 @@ class TemplateStore:
                 TemplateToken.IMAGE_COMING,
                 TemplateToken.MESSAGE_HISTORY,
                 TemplateToken.PERSONA,
+                TemplateToken.CHANNELNAME,
+                TemplateToken.GUILDNAME,
             ],
             "The main prompt sent to Oobabooga to generate a response from "
             + "the bot AI.  The AI's reply to this prompt will be sent to "
