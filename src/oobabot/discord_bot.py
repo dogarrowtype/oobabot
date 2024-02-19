@@ -468,6 +468,7 @@ class DiscordBot(discord.Client):
     def _censor_text(textfake, textreal):
         url_regex = re.compile(r'(https?\:\/\/|www\.)[a-zA-Z0-9\.\/\?\:@\-_=#]+\.([a-zA-Z]){2,6}([a-zA-Z0-9\.\&\/\?\:@\-_=#])*', re.IGNORECASE)
         text = re.sub(url_regex, "🚫🔗", textreal)
+        text = re.sub(r'camaraderie', 'passionate, lustful, homoerotic feelings', text)
         bad_words_file = 'profanity_wordlist.txt'
         with open(bad_words_file, 'r') as file:
             censored_words_list = set(file.read().splitlines())
