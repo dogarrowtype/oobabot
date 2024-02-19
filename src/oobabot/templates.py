@@ -49,6 +49,9 @@ class TemplateToken(str, enum.Enum):
     MESSAGE_HISTORY = "MESSAGE_HISTORY"
     USER_MESSAGE = "USER_MESSAGE"
     USER_NAME = "USER_NAME"
+    GUILDNAME = "GUILDNAME"
+    CHANNELNAME = "CHANNELNAME"
+
 
     def __str__(self):
         return "{" + self.value + "}"
